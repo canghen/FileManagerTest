@@ -34,8 +34,8 @@ public class InternalStorageFilesModel {
     }
 
 
-    public void setIsDir(boolean isDir) {
-        this.isDir = isDir;
+    public boolean getIsDir() {
+        return isDir;
     }
 
     public String getFilePath() {

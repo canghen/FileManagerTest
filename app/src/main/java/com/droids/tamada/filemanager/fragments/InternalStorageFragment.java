@@ -135,10 +135,14 @@ public class InternalStorageFragment extends Fragment implements MainActivity.Bu
                         selectedFileHashMap.remove(position);
                     } else {
                         String uriString = null;
-                        if (isMusicFolder) {
-                            uriString = getUriString(internalStorageFilesModel.getFilePath(), true);
-                        } else if (isMovieFolder) {
-                            uriString = getUriString(internalStorageFilesModel.getFilePath(), false);
+                        if (internalStorageFilesModel.getIsDir()) {
+                            uriString = Uri.fromFile(new File(internalStorageFilesModel.getFilePath())).toString();
+                        } else {
+                            if (isMusicFolder) {
+                                uriString = getUriString(internalStorageFilesModel.getFilePath(), true);
+                            } else if (isMovieFolder) {
+                                uriString = getUriString(internalStorageFilesModel.getFilePath(), false);
+                            }
                         }
                         Log.d("mytest", "onclick uriString = " + uriString);
                         selectedFileHashMap.put(position, uriString);
@@ -184,10 +188,14 @@ public class InternalStorageFragment extends Fragment implements MainActivity.Bu
                     if (position == i) {
                         internalStorageFilesModel.setSelected(true);
                         String uriString = null;
-                        if (isMusicFolder) {
-                            uriString = getUriString(internalStorageFilesModel.getFilePath(), true);
-                        } else if (isMovieFolder) {
-                            uriString = getUriString(internalStorageFilesModel.getFilePath(), false);
+                        if (internalStorageFilesModel.getIsDir()) {
+                            uriString = Uri.fromFile(new File(internalStorageFilesModel.getFilePath())).toString();
+                        } else {
+                            if (isMusicFolder) {
+                                uriString = getUriString(internalStorageFilesModel.getFilePath(), true);
+                            } else if (isMovieFolder) {
+                                uriString = getUriString(internalStorageFilesModel.getFilePath(), false);
+                            }
                         }
                         Log.d("mytest", "onlongclick uriString = " + uriString);
                         selectedFileHashMap.put(position, uriString);
@@ -566,6 +574,7 @@ public class InternalStorageFragment extends Fragment implements MainActivity.Bu
             return null;
         }
         Cursor cursor = null;
+
         if (isAudioFile) {
             cursor = AppController.getInstance().getApplicationContext().getContentResolver().query(
                     MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
