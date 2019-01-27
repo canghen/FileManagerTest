@@ -75,10 +75,6 @@ public class InternalStorageFragment extends Fragment implements MainActivity.Bu
     private ArrayList<InternalStorageFilesModel> internalStorageFilesModelArrayList;
     private InternalStorageListAdapter internalStorageListAdapter;
     private String rootPath;
-    private String fileExtension;
-    private RelativeLayout footerAudioPlayer;
-    private LinearLayout fileCopyLayout, fileMoveLayout;
-    private MediaPlayer mediaPlayer;
     private RelativeLayout footerLayout;
     private TextView lblFilePath;
     private ArrayList<String> arrayListFilePaths;
@@ -87,7 +83,6 @@ public class InternalStorageFragment extends Fragment implements MainActivity.Bu
     private final HashMap selectedFileHashMap = new HashMap();
     private boolean isCheckboxVisible = false;
     private AVLoadingIndicatorView progressBar;
-    private TextView lblCopyFile, lblCopyCancel, lblMoveFile, lblMoveCancel;
 
     public InternalStorageFragment() {
         // Required empty public constructor
@@ -125,13 +120,7 @@ public class InternalStorageFragment extends Fragment implements MainActivity.Bu
         lblFilePath = (TextView) view.findViewById(R.id.id_file_path);
         ImageView imgDelete = (ImageView) view.findViewById(R.id.id_delete);
         final ImageView imgFileCopy = (ImageView) view.findViewById(R.id.id_copy_file);
-        fileCopyLayout = (LinearLayout) view.findViewById(R.id.fileCopyLayout);
-        fileMoveLayout = (LinearLayout) view.findViewById(R.id.fileMoveLayout);
         ImageView imgMenu = (ImageView) view.findViewById(R.id.id_menu);
-        lblMoveFile = (TextView) view.findViewById(R.id.id_move);
-        lblMoveCancel = (TextView) view.findViewById(R.id.id_move_cancel);
-        lblCopyCancel = (TextView) view.findViewById(R.id.id_copy_cancel);
-        lblCopyFile = (TextView) view.findViewById(R.id.id_copy);
         internalStorageFilesModelArrayList = new ArrayList<>();
         arrayListFilePaths = new ArrayList<>();
         rootPath = Environment.getExternalStorageDirectory().getAbsolutePath();
@@ -164,7 +153,6 @@ public class InternalStorageFragment extends Fragment implements MainActivity.Bu
                         internalStorageListAdapter.notifyDataSetChanged();
                     }
                 } else {
-                    fileExtension = internalStorageFilesModel.getFileName().substring(internalStorageFilesModel.getFileName().lastIndexOf(".") + 1);//file extension (.mp3,.png,.pdf)
                     File file = new File(internalStorageFilesModel.getFilePath());//get the selected item path
                     openFile(file, internalStorageFilesModel);
                 }
@@ -221,41 +209,10 @@ public class InternalStorageFragment extends Fragment implements MainActivity.Bu
             }
         });
 
-        lblMoveCancel.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                selectedFileHashMap.clear();
-                isCheckboxVisible = false;
-                fileMoveLayout.setVisibility(View.GONE);
-            }
-        });
-
-        lblMoveFile.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                moveFile(lblFilePath.getText().toString());
-            }
-        });
-        lblCopyCancel.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                selectedFileHashMap.clear();
-                isCheckboxVisible = false;
-                fileCopyLayout.setVisibility(View.GONE);
-            }
-        });
-
-        lblCopyFile.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                copyFile(lblFilePath.getText().toString());
-            }
-        });
         imgFileCopy.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 footerLayout.setVisibility(View.GONE);
-                fileCopyLayout.setVisibility(View.VISIBLE);
                 for (int i = 0; i < internalStorageFilesModelArrayList.size(); i++) {
                     InternalStorageFilesModel internalStorageFilesModel = internalStorageFilesModelArrayList.get(i);
                     internalStorageFilesModel.setCheckboxVisible(false);
@@ -379,105 +336,7 @@ public class InternalStorageFragment extends Fragment implements MainActivity.Bu
                 Toast.makeText(AppController.getInstance().getApplicationContext(), "Folder can't be read!", Toast.LENGTH_SHORT).show();
             }
             //if file is not directory open a application for file type
-        } else if (fileExtension.equals("png") || fileExtension.equals("jpeg") || fileExtension.equals("jpg")) {
-            Intent imageIntent = new Intent(getActivity().getApplicationContext(), FullImageViewActivity.class);
-            imageIntent.putExtra("imagePath", internalStorageFilesModel.getFilePath());
-            getActivity().startActivity(imageIntent);
-        } else if (fileExtension.equals("mp3")) {
-            showAudioPlayer(internalStorageFilesModel.getFileName(), internalStorageFilesModel.getFilePath());
-        } else if (fileExtension.equals("txt") || fileExtension.equals("html") || fileExtension.equals("xml")) {
-            Intent txtIntent = new Intent(getActivity().getApplicationContext(), TextFileViewActivity.class);
-            txtIntent.putExtra("filePath", internalStorageFilesModel.getFilePath());
-            txtIntent.putExtra("fileName", internalStorageFilesModel.getFileName());
-            getActivity().startActivity(txtIntent);
-        } else if (fileExtension.equals("zip") || fileExtension.equals("rar")) {
-            extractZip(internalStorageFilesModel.getFileName(), internalStorageFilesModel.getFilePath());
-        } else if (fileExtension.equals("pdf")) {
-            File pdfFile = new File(internalStorageFilesModel.getFilePath());
-            PackageManager packageManager = getActivity().getPackageManager();
-            Intent testIntent = new Intent(Intent.ACTION_VIEW);
-            testIntent.setType("application/pdf");
-            List list = packageManager.queryIntentActivities(testIntent, PackageManager.MATCH_DEFAULT_ONLY);
-            if (list.size() > 0 && pdfFile.isFile()) {
-                Intent intent = new Intent();
-                intent.setAction(Intent.ACTION_VIEW);
-                Uri uri = Uri.fromFile(pdfFile);
-                intent.setDataAndType(uri, "application/pdf");
-                startActivity(intent);
-            } else {
-                Toast.makeText(getActivity().getApplicationContext(), "There is no app to handle this type of file", Toast.LENGTH_SHORT).show();
-            }
-        } else if (fileExtension.equals("mp4") || fileExtension.equals("3gp") || fileExtension.equals("wmv")) {
-            Uri fileUri = Uri.fromFile(new File(internalStorageFilesModel.getFilePath()));
-            Intent intent = new Intent(android.content.Intent.ACTION_VIEW);
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            intent.setDataAndType(fileUri, "video/*");
-            getActivity().startActivity(intent);
-        } else if (fileExtension.equals("apk")) {
-            Intent intent = new Intent(Intent.ACTION_VIEW);
-            intent.setDataAndType(Uri.fromFile(new File(internalStorageFilesModel.getFilePath())), "application/vnd.android.package-archive");
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(intent);
         }
-    }
-
-    @SuppressLint("SetTextI18n")
-    private void extractZip(String fileName, final String filePath) {
-        final Dialog extractZipDialog = new Dialog(getActivity(), android.R.style.Theme_Translucent_NoTitleBar);
-        extractZipDialog.setContentView(R.layout.custom_extract_zip_dialog);
-        Button btnOkay = (Button) extractZipDialog.findViewById(R.id.btn_okay);
-        Button btnCancel = (Button) extractZipDialog.findViewById(R.id.btn_cancel);
-        final TextView lblFileName = (TextView) extractZipDialog.findViewById(R.id.id_file_name);
-        lblFileName.setText("Are you sure you want to extract " + fileName);
-        btnCancel.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                extractZipDialog.dismiss();
-                lblFileName.setText("");
-            }
-        });
-        btnOkay.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                extractZipDialog.dismiss();
-                progressBar.setVisibility(View.VISIBLE);
-                byte[] buffer = new byte[1024];
-                try {
-                    File folder = new File(rootPath);//create output directory is not exists
-                    if (!folder.exists()) {
-                        folder.mkdir();
-                    }
-                    ZipInputStream zis =
-                            new ZipInputStream(new FileInputStream(filePath));//get the zip file content
-                    ZipEntry ze = zis.getNextEntry(); //get the zipped file list entry
-                    while (ze != null) {
-                        String unzipFileName = ze.getName();
-                        File newFile = new File(rootPath + File.separator + unzipFileName);
-                        //create all non exists folders
-                        //else you will hit FileNotFoundException for compressed folder
-                        new File(newFile.getParent()).mkdirs();
-                        FileOutputStream fos = new FileOutputStream(newFile);
-                        int len;
-                        while ((len = zis.read(buffer)) > 0) {
-                            fos.write(buffer, 0, len);
-                        }
-                        fos.close();
-                        ze = zis.getNextEntry();
-                    }
-                    zis.closeEntry();
-                    zis.close();
-                    progressBar.setVisibility(View.GONE);
-                } catch (IOException ex) {
-                    AppController.getInstance().trackException(ex);
-                    progressBar.setVisibility(View.GONE);
-                    ex.printStackTrace();
-                    extractZipDialog.dismiss();
-                }
-            }
-        });
-
-        extractZipDialog.show();
-
     }
 
     private void getFilesList(String filePath) {
@@ -520,7 +379,6 @@ public class InternalStorageFragment extends Fragment implements MainActivity.Bu
         final Dialog menuDialog = new Dialog(getActivity(), android.R.style.Theme_Translucent_NoTitleBar);
         menuDialog.setContentView(R.layout.custom_menu_dialog);
         TextView lblRenameFile = (TextView) menuDialog.findViewById(R.id.id_rename);
-        TextView lblFileDetails = (TextView) menuDialog.findViewById(R.id.id_file_details);
         TextView lblFileMove = (TextView) menuDialog.findViewById(R.id.id_move);
 
         if (selectedFileHashMap.size() == 1) {
@@ -528,19 +386,13 @@ public class InternalStorageFragment extends Fragment implements MainActivity.Bu
             lblRenameFile.setFocusable(true);
             lblFileMove.setClickable(true);
             lblFileMove.setFocusable(true);
-            lblFileDetails.setFocusable(true);
-            lblFileDetails.setClickable(true);
             lblRenameFile.setTextColor(ContextCompat.getColor(AppController.getInstance().getApplicationContext(), R.color.color_text_selected));
             lblFileMove.setTextColor(ContextCompat.getColor(AppController.getInstance().getApplicationContext(), R.color.color_text_selected));
-            lblFileDetails.setTextColor(ContextCompat.getColor(AppController.getInstance().getApplicationContext(), R.color.color_text_selected));
         } else {
             lblRenameFile.setClickable(false);
             lblRenameFile.setFocusable(false);
             lblFileMove.setClickable(false);
             lblFileMove.setFocusable(false);
-            lblFileDetails.setFocusable(false);
-            lblFileDetails.setClickable(false);
-            lblFileDetails.setTextColor(ContextCompat.getColor(AppController.getInstance().getApplicationContext(), R.color.color_text_unselected));
             lblRenameFile.setTextColor(ContextCompat.getColor(AppController.getInstance().getApplicationContext(), R.color.color_text_unselected));
             lblFileMove.setTextColor(ContextCompat.getColor(AppController.getInstance().getApplicationContext(), R.color.color_text_unselected));
         }
@@ -550,7 +402,6 @@ public class InternalStorageFragment extends Fragment implements MainActivity.Bu
             public void onClick(View view) {
                 menuDialog.dismiss();
                 footerLayout.setVisibility(View.GONE);
-                fileMoveLayout.setVisibility(View.VISIBLE);
                 for (int i = 0; i < internalStorageFilesModelArrayList.size(); i++) {
                     InternalStorageFilesModel internalStorageFilesModel = internalStorageFilesModelArrayList.get(i);
                     internalStorageFilesModel.setCheckboxVisible(false);
@@ -564,14 +415,6 @@ public class InternalStorageFragment extends Fragment implements MainActivity.Bu
             public void onClick(View view) {
                 InternalStorageFilesModel internalStorageFilesModel = internalStorageFilesModelArrayList.get(selectedFilePosition);
                 renameFile(menuDialog, internalStorageFilesModel.getFileName(), internalStorageFilesModel.getFilePath(), selectedFilePosition);
-            }
-        });
-        lblFileDetails.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                menuDialog.dismiss();
-                InternalStorageFilesModel internalStorageFilesModel = internalStorageFilesModelArrayList.get(selectedFilePosition);
-                showFileDetails(internalStorageFilesModel.getFileName(), internalStorageFilesModel.getFilePath());
             }
         });
         menuDialog.show();
@@ -626,7 +469,6 @@ public class InternalStorageFragment extends Fragment implements MainActivity.Bu
             internalStorageListAdapter.notifyDataSetChanged();//refresh the adapter
             selectedFileHashMap.clear();
             footerLayout.setVisibility(View.GONE);
-            fileMoveLayout.setVisibility(View.GONE);
             progressBar.setVisibility(View.GONE);
         } catch (Exception e) {
             AppController.getInstance().trackException(e);
@@ -669,7 +511,6 @@ public class InternalStorageFragment extends Fragment implements MainActivity.Bu
             internalStorageListAdapter.notifyDataSetChanged();//refresh the adapter
             selectedFileHashMap.clear();
             footerLayout.setVisibility(View.GONE);
-            fileCopyLayout.setVisibility(View.GONE);
             progressBar.setVisibility(View.GONE);
         } catch (Exception e) {
             AppController.getInstance().trackException(e);
@@ -730,102 +571,6 @@ public class InternalStorageFragment extends Fragment implements MainActivity.Bu
             public void onClick(View view) {
                 txtRenameFile.setText("");
                 dialogRenameFile.dismiss();
-            }
-        });
-    }
-
-    @SuppressLint("SetTextI18n")
-    private void showFileDetails(String fileName, String filePath) {
-        final Dialog fileDetailsDialog = new Dialog(getActivity(), android.R.style.Theme_Translucent_NoTitleBar);
-        fileDetailsDialog.setContentView(R.layout.custom_file_details_dialog);
-        final TextView lblFileName = (TextView) fileDetailsDialog.findViewById(R.id.id_name);
-        final TextView lblFilePath = (TextView) fileDetailsDialog.findViewById(R.id.id_path);
-        final TextView lblSize = (TextView) fileDetailsDialog.findViewById(R.id.id_size);
-        final TextView lblCreateAt = (TextView) fileDetailsDialog.findViewById(R.id.id_create_at);
-        lblFileName.setText("Name :" + fileName);
-        lblFilePath.setText("Path :" + filePath);
-        File file = new File(filePath);
-        if (file.isDirectory()) {
-            int subFolders = file.list().length;
-            lblSize.setText("items :" + subFolders);
-        } else {
-            long length = file.length();
-            length = length / 1024;
-            if (length >= 1024) {
-                length = length / 1024;
-                lblSize.setText("Size :" + length + " MB");
-            } else {
-                lblSize.setText("Size :" + length + " KB");
-            }
-        }
-        Date lastModDate = new Date(file.lastModified());
-        lblCreateAt.setText("Created on :" + lastModDate.toString());
-        Button btnOkay = (Button) fileDetailsDialog.findViewById(R.id.btn_okay);
-        btnOkay.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                lblFileName.setText("");
-                lblFilePath.setText("");
-                lblSize.setText("");
-                lblCreateAt.setText("");
-                fileDetailsDialog.dismiss();
-            }
-        });
-        fileDetailsDialog.show();
-    }
-
-    private void showAudioPlayer(String fileName, String filePath) {
-        final Dialog audioPlayerDialog = new Dialog(getActivity(), android.R.style.Theme_Translucent_NoTitleBar);
-        audioPlayerDialog.setContentView(R.layout.custom_audio_player_dialog);
-        footerAudioPlayer = (RelativeLayout) audioPlayerDialog.findViewById(R.id.id_layout_audio_player);
-        TextView lblAudioFileName = (TextView) audioPlayerDialog.findViewById(R.id.ic_audio_file_name);
-        ToggleButton toggleBtnPlayPause = (ToggleButton) audioPlayerDialog.findViewById(R.id.id_play_pause);
-        toggleBtnPlayPause.setChecked(true);
-        lblAudioFileName.setText(fileName);
-        audioPlayerDialog.show();
-        mediaPlayer = new MediaPlayer();
-        try {
-            mediaPlayer.setDataSource(filePath);
-            mediaPlayer.prepare();
-        } catch (IOException e) {
-            AppController.getInstance().trackException(e);
-            e.printStackTrace();
-        }
-        mediaPlayer.start();
-        footerAudioPlayer.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                mediaPlayer.stop();
-                mediaPlayer.reset();
-                audioPlayerDialog.dismiss();
-            }
-        });
-        toggleBtnPlayPause.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                if (isChecked) {
-                    if (mediaPlayer != null) {
-                        mediaPlayer.start();
-                    }
-                } else {
-                    if (mediaPlayer != null) {
-                        mediaPlayer.pause();
-                    }
-                }
-            }
-        });
-        audioPlayerDialog.setOnKeyListener(new Dialog.OnKeyListener() {
-
-            @Override
-            public boolean onKey(DialogInterface arg0, int keyCode,
-                                 KeyEvent event) {
-                // TODO Auto-generated method stub
-                if (keyCode == KeyEvent.KEYCODE_BACK) {
-                    mediaPlayer.stop();
-                    mediaPlayer.reset();
-                    audioPlayerDialog.dismiss();
-                }
-                return true;
             }
         });
     }

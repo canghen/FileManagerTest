@@ -421,26 +421,19 @@ public class ExternalStorageFragment extends Fragment implements MainActivity.Bu
         final Dialog menuDialog = new Dialog(getActivity(), android.R.style.Theme_Translucent_NoTitleBar);
         menuDialog.setContentView(R.layout.custom_menu_dialog);
         TextView lblRenameFile = (TextView) menuDialog.findViewById(R.id.id_rename);
-        TextView lblFileDetails = (TextView) menuDialog.findViewById(R.id.id_file_details);
         TextView lblFileMove = (TextView) menuDialog.findViewById(R.id.id_move);
         if (selectedFileHashMap.size() == 1) {
             lblRenameFile.setClickable(true);
             lblRenameFile.setFocusable(true);
             lblFileMove.setClickable(true);
             lblFileMove.setFocusable(true);
-            lblFileDetails.setFocusable(true);
-            lblFileDetails.setClickable(true);
             lblRenameFile.setTextColor(ContextCompat.getColor(AppController.getInstance().getApplicationContext(), R.color.color_text_selected));
             lblFileMove.setTextColor(ContextCompat.getColor(AppController.getInstance().getApplicationContext(), R.color.color_text_selected));
-            lblFileDetails.setTextColor(ContextCompat.getColor(AppController.getInstance().getApplicationContext(), R.color.color_text_selected));
         } else {
             lblRenameFile.setClickable(false);
             lblRenameFile.setFocusable(false);
             lblFileMove.setClickable(false);
             lblFileMove.setFocusable(false);
-            lblFileDetails.setFocusable(false);
-            lblFileDetails.setClickable(false);
-            lblFileDetails.setTextColor(ContextCompat.getColor(AppController.getInstance().getApplicationContext(), R.color.color_text_unselected));
             lblRenameFile.setTextColor(ContextCompat.getColor(AppController.getInstance().getApplicationContext(), R.color.color_text_unselected));
             lblFileMove.setTextColor(ContextCompat.getColor(AppController.getInstance().getApplicationContext(), R.color.color_text_unselected));
         }
@@ -466,14 +459,7 @@ public class ExternalStorageFragment extends Fragment implements MainActivity.Bu
                 renameFile(menuDialog, externalStorageFilesModel.getFileName(), externalStorageFilesModel.getFilePath(), selectedFilePosition);
             }
         });
-        lblFileDetails.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                menuDialog.dismiss();
-                ExternalStorageFilesModel externalStorageFilesModel = externalStorageFilesModelArrayList.get(selectedFilePosition);
-                showFileDetails(externalStorageFilesModel.getFileName(), externalStorageFilesModel.getFilePath());
-            }
-        });
+
         menuDialog.show();
     }
 
