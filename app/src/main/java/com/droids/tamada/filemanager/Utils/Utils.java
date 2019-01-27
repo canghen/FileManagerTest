@@ -2,6 +2,8 @@ package com.droids.tamada.filemanager.Utils;
 
 import android.content.res.Resources;
 
+import java.util.HashMap;
+
 /**
  * Created by satish on 28/10/16.
  */
@@ -19,5 +21,17 @@ public class Utils {
     public static float sp2px(Resources resources, float sp){
         final float scale = resources.getDisplayMetrics().scaledDensity;
         return sp * scale;
+    }
+
+    public static String[] getUriStringForHashmap(HashMap<Integer, String> selectedFileHashMap) {
+        String[] uriString = new String[selectedFileHashMap.size()];
+        String value;
+        int i = 0;
+        for (Integer key : selectedFileHashMap.keySet()) {
+            value = selectedFileHashMap.get(key);
+            uriString[i] = value;
+            i++;
+        }
+        return uriString;
     }
 }

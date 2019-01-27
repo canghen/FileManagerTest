@@ -1,15 +1,16 @@
 package com.droids.tamada.filemanager.fragments;
 
-import android.annotation.SuppressLint;
 import android.app.Dialog;
+import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.media.MediaPlayer;
+import android.content.IntentFilter;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.provider.MediaStore;
 import android.support.v4.app.Fragment;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.widget.DefaultItemAnimator;
@@ -17,7 +18,6 @@ import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 import android.view.GestureDetector;
-import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
@@ -25,20 +25,16 @@ import android.view.ViewGroup;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
 import android.widget.Button;
-import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.widget.ToggleButton;
 
 import com.droids.tamada.filemanager.Animations.AVLoadingIndicatorView;
-import com.droids.tamada.filemanager.activity.FullImageViewActivity;
-import com.droids.tamada.filemanager.activity.ImageViewActivity;
+import com.droids.tamada.filemanager.Utils.Utils;
 import com.droids.tamada.filemanager.activity.MainActivity;
-import com.droids.tamada.filemanager.activity.TextFileViewActivity;
 import com.droids.tamada.filemanager.adapter.InternalStorageListAdapter;
 import com.droids.tamada.filemanager.app.AppController;
 import com.droids.tamada.filemanager.helper.PreferManager;
@@ -46,20 +42,10 @@ import com.droids.tamada.filemanager.model.InternalStorageFilesModel;
 import com.example.satish.filemanager.R;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Set;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 
 
 public class InternalStorageFragment extends Fragment implements MainActivity.ButtonBackPressListener {
@@ -80,9 +66,12 @@ public class InternalStorageFragment extends Fragment implements MainActivity.Bu
     private ArrayList<String> arrayListFilePaths;
     private PreferManager preferManager;
     private int selectedFilePosition;
-    private final HashMap selectedFileHashMap = new HashMap();
+    private final HashMap<Integer, String> selectedFileHashMap = new HashMap();
     private boolean isCheckboxVisible = false;
     private AVLoadingIndicatorView progressBar;
+
+    private boolean isMusicFolder = false;
+    private boolean isMovieFolder = false;
 
     public InternalStorageFragment() {
         // Required empty public constructor
@@ -145,7 +134,14 @@ public class InternalStorageFragment extends Fragment implements MainActivity.Bu
                         internalStorageListAdapter.notifyDataSetChanged();
                         selectedFileHashMap.remove(position);
                     } else {
-                        selectedFileHashMap.put(position, internalStorageFilesModel.getFilePath());
+                        String uriString = null;
+                        if (isMusicFolder) {
+                            uriString = getUriString(internalStorageFilesModel.getFilePath(), true);
+                        } else if (isMovieFolder) {
+                            uriString = getUriString(internalStorageFilesModel.getFilePath(), false);
+                        }
+                        Log.d("mytest", "onclick uriString = " + uriString);
+                        selectedFileHashMap.put(position, uriString);
                         internalStorageFilesModel.setSelected(true);
                         selectedFilePosition = position;
                         internalStorageFilesModelArrayList.remove(position);
@@ -187,7 +183,14 @@ public class InternalStorageFragment extends Fragment implements MainActivity.Bu
                     isCheckboxVisible = true;
                     if (position == i) {
                         internalStorageFilesModel.setSelected(true);
-                        selectedFileHashMap.put(position, internalStorageFilesModel.getFilePath());
+                        String uriString = null;
+                        if (isMusicFolder) {
+                            uriString = getUriString(internalStorageFilesModel.getFilePath(), true);
+                        } else if (isMovieFolder) {
+                            uriString = getUriString(internalStorageFilesModel.getFilePath(), false);
+                        }
+                        Log.d("mytest", "onlongclick uriString = " + uriString);
+                        selectedFileHashMap.put(position, uriString);
                         selectedFilePosition = position;
                     }
                 }
@@ -198,6 +201,15 @@ public class InternalStorageFragment extends Fragment implements MainActivity.Bu
         imgDelete.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                footerLayout.setVisibility(View.GONE);
+                for (int i = 0; i < internalStorageFilesModelArrayList.size(); i++) {
+                    InternalStorageFilesModel internalStorageFilesModel = internalStorageFilesModelArrayList.get(i);
+                    internalStorageFilesModel.setCheckboxVisible(false);
+                    internalStorageFilesModel.setSelected(false);
+                }
+                internalStorageListAdapter.notifyDataSetChanged();
+                isCheckboxVisible = false;
+
                 deleteFile();
             }
         });
@@ -216,11 +228,19 @@ public class InternalStorageFragment extends Fragment implements MainActivity.Bu
                 for (int i = 0; i < internalStorageFilesModelArrayList.size(); i++) {
                     InternalStorageFilesModel internalStorageFilesModel = internalStorageFilesModelArrayList.get(i);
                     internalStorageFilesModel.setCheckboxVisible(false);
+                    internalStorageFilesModel.setSelected(false);
                 }
                 internalStorageListAdapter.notifyDataSetChanged();
                 isCheckboxVisible = false;
+
+                copy();
             }
         });
+
+        IntentFilter filter = new IntentFilter();
+        filter.addAction("com.parrot.filemanager.action.DELETE_RESULT");
+        filter.addAction("com.parrot.filemanager.action.RENAME_RESULT");
+        AppController.getInstance().getApplicationContext().registerReceiver(mReceiver, filter);
 
         return view;
     }
@@ -263,66 +283,57 @@ public class InternalStorageFragment extends Fragment implements MainActivity.Bu
     }
 
     @Override
-    public void onAttach(Context context) {
-        super.onAttach(context);
-        /*if (context instanceof OnFragmentInteractionListener) {
-            mListener = (OnFragmentInteractionListener) context;
-        } else {
-            throw new RuntimeException(context.toString()
-                    + " must implement OnFragmentInteractionListener");
-        }*/
-    }
-
-    @Override
     public void onDetach() {
         super.onDetach();
         mListener = null;
     }
 
-    private void deleteFile() {
-        final Dialog dialogDeleteFile = new Dialog(getActivity(), android.R.style.Theme_Translucent_NoTitleBar);
-        dialogDeleteFile.setContentView(R.layout.custom_delete_file_dialog);
-        dialogDeleteFile.show();
-        Button btnOkay = (Button) dialogDeleteFile.findViewById(R.id.btn_okay);
-        Button btnCancel = (Button) dialogDeleteFile.findViewById(R.id.btn_cancel);
-        TextView lblDeleteFile = (TextView) dialogDeleteFile.findViewById(R.id.id_lbl_delete_files);
-        if (selectedFileHashMap.size() == 1) {
-            lblDeleteFile.setText(AppController.getInstance().getApplicationContext().getResources().getString(R.string.lbl_delete_single_file));
-        } else {
-            lblDeleteFile.setText(AppController.getInstance().getApplicationContext().getResources().getString(R.string.lbl_delete_multiple_files));
+    private BroadcastReceiver mReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if ("com.parrot.filemanager.action.DELETE_RESULT".equals(action)) {
+                Log.d("mytest", "Refresh list after delete");
+                internalStorageFilesModelArrayList.clear();
+                getFilesList(rootPath);
+                internalStorageListAdapter.notifyDataSetChanged();
+            } else if ("com.parrot.filemanager.action.RENAME_RESULT".equals(action)) {
+                Log.d("mytest", "Refresh list after rename");
+                internalStorageFilesModelArrayList.clear();
+                getFilesList(rootPath);
+                internalStorageListAdapter.notifyDataSetChanged();
+            }
         }
-        btnOkay.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                try {
-                    Set set = selectedFileHashMap.keySet();
-                    Iterator itr = set.iterator();
-                    while (itr.hasNext()) {
-                        int i = Integer.parseInt(itr.next().toString());
-                        File deleteFile = new File((String) selectedFileHashMap.get(i));//create file for selected file
-                        boolean isDeleteFile = deleteFile.delete();//delete the file from memory
-                        if (isDeleteFile) {
-                            selectedFileHashMap.remove(i);
-                            InternalStorageFilesModel model = internalStorageFilesModelArrayList.get(i);
-                            internalStorageFilesModelArrayList.remove(model);//remove file from listview
-                            internalStorageListAdapter.notifyDataSetChanged();//refresh the adapter
-                            selectedFileHashMap.remove(selectedFilePosition);
-                        }
-                    }
-                    dialogDeleteFile.dismiss();
-                    footerLayout.setVisibility(View.GONE);
-                } catch (Exception e) {
-                    AppController.getInstance().trackException(e);
-                    e.printStackTrace();
-                }
-            }
-        });
-        btnCancel.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                dialogDeleteFile.dismiss();
-            }
-        });
+    };
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        AppController.getInstance().getApplicationContext().unregisterReceiver(mReceiver);
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == 0) {
+            Log.d("mytest", "Refresh list after move");
+            internalStorageFilesModelArrayList.clear();
+            getFilesList(rootPath);
+            internalStorageListAdapter.notifyDataSetChanged();
+        }
+    }
+
+    private void deleteFile() {
+        String[] uriStrings = Utils.getUriStringForHashmap(selectedFileHashMap);
+        Intent intent = new Intent("com.parrot.filemanager.action.DELETE");
+        intent.setPackage("com.parrot.car.filemanager");
+        intent.putExtra("file_uri", uriStrings);
+        if (isMusicFolder) {
+            intent.putExtra("app_type", "Music");
+        } else if (isMovieFolder) {
+            intent.putExtra("app_type", "MTT");
+        }
+        AppController.getInstance().getApplicationContext().startService(intent);
     }
 
     private void openFile(File file, InternalStorageFilesModel internalStorageFilesModel) {
@@ -330,6 +341,19 @@ public class InternalStorageFragment extends Fragment implements MainActivity.Bu
             if (file.canRead()) {//if directory is readable
                 internalStorageFilesModelArrayList.clear();
                 arrayListFilePaths.add(internalStorageFilesModel.getFilePath());
+                String path = internalStorageFilesModel.getFilePath().substring(20);
+                Log.d("mytest", "path = " + path);
+                if (path.startsWith("Music")) {
+                    isMusicFolder = true;
+                    isMovieFolder = false;
+                } else if (path.startsWith("Movies")) {
+                    isMusicFolder = false;
+                    isMovieFolder = true;
+                } else {
+                    isMusicFolder = false;
+                    isMovieFolder = false;
+                }
+                Log.d("mytest", "isMusic = " + isMusicFolder + " isMovies = " + isMovieFolder);
                 getFilesList(internalStorageFilesModel.getFilePath());
                 internalStorageListAdapter.notifyDataSetChanged();
             } else {//Toast to your not openable type
@@ -353,6 +377,10 @@ public class InternalStorageFragment extends Fragment implements MainActivity.Bu
                 noMediaLayout.setVisibility(View.GONE);
             }
             for (File file : files) {
+                if (filePath.equals(Environment.getExternalStorageDirectory().getAbsolutePath())
+                        && !"Music".equals(file.getName()) && !"Movies".equals(file.getName())) {
+                    continue;
+                }
                 InternalStorageFilesModel model = new InternalStorageFilesModel();
                 model.setFileName(file.getName());
                 model.setFilePath(file.getPath());
@@ -405,174 +433,78 @@ public class InternalStorageFragment extends Fragment implements MainActivity.Bu
                 for (int i = 0; i < internalStorageFilesModelArrayList.size(); i++) {
                     InternalStorageFilesModel internalStorageFilesModel = internalStorageFilesModelArrayList.get(i);
                     internalStorageFilesModel.setCheckboxVisible(false);
+                    internalStorageFilesModel.setSelected(false);
                 }
                 internalStorageListAdapter.notifyDataSetChanged();
                 isCheckboxVisible = false;
+
+                move();
             }
         });
         lblRenameFile.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                InternalStorageFilesModel internalStorageFilesModel = internalStorageFilesModelArrayList.get(selectedFilePosition);
-                renameFile(menuDialog, internalStorageFilesModel.getFileName(), internalStorageFilesModel.getFilePath(), selectedFilePosition);
+                menuDialog.dismiss();
+                footerLayout.setVisibility(View.GONE);
+                for (int i = 0; i < internalStorageFilesModelArrayList.size(); i++) {
+                    InternalStorageFilesModel internalStorageFilesModel = internalStorageFilesModelArrayList.get(i);
+                    internalStorageFilesModel.setCheckboxVisible(false);
+                    internalStorageFilesModel.setSelected(false);
+                }
+                internalStorageListAdapter.notifyDataSetChanged();
+                isCheckboxVisible = false;
+
+                rename();
             }
         });
         menuDialog.show();
     }
 
-    private void moveFile(String outputPath) {
-        progressBar.setVisibility(View.VISIBLE);
-        try {
-            Set set = selectedFileHashMap.keySet();
-            Iterator itr = set.iterator();
-            while (itr.hasNext()) {
-                int i = Integer.parseInt(itr.next().toString());
-                File file = new File((String) selectedFileHashMap.get(i));
-                InputStream in = null;
-                OutputStream out = null;
-                try {
-                    //create output directory if it doesn't exist
-                    File dir = new File(outputPath);
-                    if (!dir.exists()) {
-                        dir.mkdirs();
-                    }
-                    in = new FileInputStream((String) selectedFileHashMap.get(i));
-                    out = new FileOutputStream(outputPath + "/" + file.getName());
-                    byte[] buffer = new byte[1024];
-                    int read;
-                    while ((read = in.read(buffer)) != -1) {
-                        out.write(buffer, 0, read);
-                    }
-                    in.close();
-                    in = null;
-                    // write the output file
-                    out.flush();
-                    out.close();
-                    out = null;
-                    // delete the original file
-                    new File((String) selectedFileHashMap.get(i)).delete();
-                } catch (Exception e) {
-                    AppController.getInstance().trackException(e);
-                    Log.e("tag", e.getMessage());
-                }
-                InternalStorageFilesModel model = new InternalStorageFilesModel();
-                model.setSelected(false);
-                model.setFilePath(outputPath + "/" + file.getName());
-                model.setFileName(file.getName());
-                if (new File(outputPath + "/" + file.getName()).isDirectory()) {
-                    model.setIsDir(true);
-                } else {
-                    model.setIsDir(false);
-                }
-                internalStorageFilesModelArrayList.add(model);
-            }
-            internalStorageListAdapter.notifyDataSetChanged();//refresh the adapter
-            selectedFileHashMap.clear();
-            footerLayout.setVisibility(View.GONE);
-            progressBar.setVisibility(View.GONE);
-        } catch (Exception e) {
-            AppController.getInstance().trackException(e);
-            e.printStackTrace();
-            Toast.makeText(AppController.getInstance().getApplicationContext(), "unable to process this action", Toast.LENGTH_SHORT).show();
-            progressBar.setVisibility(View.GONE);
+    private void move() {
+        String[] uriStrings = Utils.getUriStringForHashmap(selectedFileHashMap);
+        Intent intent = new Intent("com.parrot.filemanager.action.PASTE");
+        intent.addCategory("com.parrot.filemanager.CATEGORY");
+        intent.setComponent(new ComponentName("com.parrot.car.filemanager",
+                "com.parrot.car.filemanager.FileManagerActivity"));
+        intent.putExtra("file_uri", uriStrings);
+        if (isMusicFolder) {
+            intent.putExtra("app_type", "Music");
+        } else if (isMovieFolder) {
+            intent.putExtra("app_type", "MTT");
         }
-
+        intent.putExtra("is_move", true);
+        startActivityForResult(intent, 0);
+        selectedFileHashMap.clear();
     }
 
-    private void copyFile(String outputPath) {
-        progressBar.setVisibility(View.VISIBLE);
-        try {
-            Set set = selectedFileHashMap.keySet();
-            Iterator itr = set.iterator();
-            while (itr.hasNext()) {
-                int i = Integer.parseInt(itr.next().toString());
-                File file = new File((String) selectedFileHashMap.get(i));
-                InputStream in = new FileInputStream((String) selectedFileHashMap.get(i));
-                OutputStream out = new FileOutputStream(outputPath + "/" + file.getName());
-                // Transfer bytes from in to out
-                byte[] buf = new byte[1024];
-                int len;
-                while ((len = in.read(buf)) > 0) {
-                    out.write(buf, 0, len);
-                }
-                in.close();
-                out.close();
-                InternalStorageFilesModel model = new InternalStorageFilesModel();
-                model.setSelected(false);
-                model.setFilePath(outputPath + "/" + file.getName());
-                model.setFileName(file.getName());
-                if (new File(outputPath + "/" + file.getName()).isDirectory()) {
-                    model.setIsDir(true);
-                } else {
-                    model.setIsDir(false);
-                }
-                internalStorageFilesModelArrayList.add(model);
-            }
-            internalStorageListAdapter.notifyDataSetChanged();//refresh the adapter
-            selectedFileHashMap.clear();
-            footerLayout.setVisibility(View.GONE);
-            progressBar.setVisibility(View.GONE);
-        } catch (Exception e) {
-            AppController.getInstance().trackException(e);
-            e.printStackTrace();
-            Toast.makeText(AppController.getInstance().getApplicationContext(), "unable to process this action", Toast.LENGTH_SHORT).show();
-            progressBar.setVisibility(View.GONE);
+    private void copy() {
+        String[] uriStrings = Utils.getUriStringForHashmap(selectedFileHashMap);
+        Intent intent = new Intent("com.parrot.filemanager.action.PASTE");
+        intent.addCategory("com.parrot.filemanager.CATEGORY");
+        intent.setComponent(new ComponentName("com.parrot.car.filemanager",
+                "com.parrot.car.filemanager.FileManagerActivity"));
+        intent.putExtra("file_uri", uriStrings);
+        if (isMusicFolder) {
+            intent.putExtra("app_type", "Music");
+        } else if (isMovieFolder) {
+            intent.putExtra("app_type", "MTT");
         }
+        intent.putExtra("is_move", false);
+        startActivity(intent);
+        selectedFileHashMap.clear();
     }
 
-    private void renameFile(final Dialog menuDialog, String fileName, final String filePath, final int selectedFilePosition) {
-        final Dialog dialogRenameFile = new Dialog(getActivity(), android.R.style.Theme_Translucent_NoTitleBar);
-        dialogRenameFile.setContentView(R.layout.custom_rename_file_dialog);
-        dialogRenameFile.show();
-        final EditText txtRenameFile = (EditText) dialogRenameFile.findViewById(R.id.txt_file_name);
-        Button btnRename = (Button) dialogRenameFile.findViewById(R.id.btn_rename);
-        Button btnCancel = (Button) dialogRenameFile.findViewById(R.id.btn_cancel);
-        txtRenameFile.setText(fileName);
-        btnRename.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if (txtRenameFile.getText().toString().trim().length() == 0) {
-                    Toast.makeText(AppController.getInstance().getApplicationContext(), "Please enter file name", Toast.LENGTH_SHORT).show();
-                } else {
-                    File renamedFile = new File(filePath.substring(0, filePath.lastIndexOf('/') + 1) + txtRenameFile.getText().toString());
-                    if (renamedFile.exists()) {
-                        Toast.makeText(AppController.getInstance().getApplicationContext(), "File already exits,choose another name", Toast.LENGTH_SHORT).show();
-                    } else {
-                        final File oldFile = new File(filePath);//create file with old name
-                        boolean isRenamed = oldFile.renameTo(renamedFile);
-                        if (isRenamed) {
-                            InternalStorageFilesModel model = internalStorageFilesModelArrayList.get(selectedFilePosition);
-                            model.setFileName(txtRenameFile.getText().toString());
-                            model.setFilePath(renamedFile.getPath());
-                            if (renamedFile.isDirectory()) {
-                                model.setIsDir(true);
-                            } else {
-                                model.setIsDir(false);
-                            }
-                            model.setSelected(false);
-                            internalStorageFilesModelArrayList.remove(selectedFilePosition);
-                            internalStorageFilesModelArrayList.add(selectedFilePosition, model);
-                            internalStorageListAdapter.notifyDataSetChanged();
-                            dialogRenameFile.dismiss();
-                            menuDialog.dismiss();
-                            footerLayout.setVisibility(View.GONE);
-                        } else {
-                            Toast.makeText(AppController.getInstance().getApplicationContext(), AppController.getInstance().getApplicationContext().getString(R.string.msg_prompt_not_renamed), Toast.LENGTH_SHORT).show();
-                            dialogRenameFile.dismiss();
-                            menuDialog.dismiss();
-                            footerLayout.setVisibility(View.GONE);
-                        }
-                    }
-                }
-            }
-        });
-        btnCancel.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                txtRenameFile.setText("");
-                dialogRenameFile.dismiss();
-            }
-        });
+    private void rename() {
+        String[] uriStrings = Utils.getUriStringForHashmap(selectedFileHashMap);
+        Intent intent = new Intent("com.parrot.filemanager.action.RENAME");
+        intent.setPackage("com.parrot.car.filemanager");
+        intent.putExtra("file_uri", uriStrings);
+        if (isMusicFolder) {
+            intent.putExtra("app_type", "Music");
+        } else if (isMovieFolder) {
+            intent.putExtra("app_type", "MTT");
+        }
+        AppController.getInstance().getApplicationContext().startService(intent);
     }
 
     public interface ClickListener {
@@ -625,6 +557,45 @@ public class InternalStorageFragment extends Fragment implements MainActivity.Bu
         public void onRequestDisallowInterceptTouchEvent(boolean disallowIntercept) {
 
         }
+    }
+
+    private String getUriString(String filePath, boolean isAudioFile) {
+        File file2 = new File(filePath);
+        if (!file2.exists()) {
+            Log.e("mytest", "file is not existing");
+            return null;
+        }
+        Cursor cursor = null;
+        if (isAudioFile) {
+            cursor = AppController.getInstance().getApplicationContext().getContentResolver().query(
+                    MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                    new String[]{MediaStore.Audio.Media._ID},
+                    MediaStore.Audio.Media.DATA + "=? ",
+                    new String[]{filePath},
+                    null);
+        } else {
+            cursor = AppController.getInstance().getApplicationContext().getContentResolver().query(
+                    MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+                    new String[]{MediaStore.Video.Media._ID},
+                    MediaStore.Video.Media.DATA + "=? ",
+                    new String[]{filePath},
+                    null);
+        }
+        Log.d("mytest", "Cursor = " + cursor);
+        if (cursor != null && cursor.getCount() > 0 && cursor.moveToFirst()) {
+            if (isAudioFile) {
+                int id = cursor.getInt(0);
+                cursor.close();
+                return Uri.withAppendedPath(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                        "" + id).toString();
+            } else {
+                int id = cursor.getInt(0);
+                cursor.close();
+                return Uri.withAppendedPath(MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+                        "" + id).toString();
+            }
+        }
+        return null;
     }
 
 }
