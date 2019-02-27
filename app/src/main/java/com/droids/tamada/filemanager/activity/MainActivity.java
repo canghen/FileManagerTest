@@ -19,6 +19,7 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.Button;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
@@ -30,6 +31,7 @@ import com.droids.tamada.filemanager.fragments.InternalStorageFragment;
 import com.droids.tamada.filemanager.fragments.SettingsFragment;
 import com.droids.tamada.filemanager.fragments.VideosListFragment;
 import com.droids.tamada.filemanager.helper.ArcProgress;
+import com.droids.tamada.filemanager.helper.MediaScannerUtil;
 import com.droids.tamada.filemanager.helper.PreferManager;
 import com.example.satish.filemanager.R;
 import com.google.android.gms.ads.AdRequest;
@@ -72,6 +74,19 @@ public class MainActivity extends AppCompatActivity {
                 });
             }
         }
+        Button button_scan = findViewById(R.id.scan);
+        button_scan.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String[] filePaths = new String[]{Environment.getExternalStorageDirectory().getPath()};
+                File[] files = new File[filePaths.length];
+                for (int i = 0; i < filePaths.length; i++) {
+                    files[i] = new File(filePaths[i]);
+                    Log.e("======","========" + files[i].isDirectory());
+                }
+                new MediaScannerUtil(MainActivity.this).scanFiles(files);
+            }
+        });
     }
 
 

@@ -1,11 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<android.support.design.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fitsSystemWindows="true"
     tools:context="com.droids.tamada.filemanager.activity.MainActivity">
 
-    <include layout="@layout/content_main" />
+    <Button
+        android:id="@+id/scan"
+        android:text="扫描sdcard下Music和Movies目录"
+        android:layout_centerHorizontal="true"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
 
-</android.support.design.widget.CoordinatorLayout>
+    <include layout="@layout/content_main" android:layout_width="match_parent"
+        android:layout_height="match_parent"
+
+        android:layout_below="@id/scan"/>
+
+</RelativeLayout>
