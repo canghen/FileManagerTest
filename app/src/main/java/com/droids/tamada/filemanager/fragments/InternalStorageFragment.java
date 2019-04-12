@@ -247,7 +247,7 @@ public class InternalStorageFragment extends Fragment implements MainActivity.Bu
 
         IntentFilter filter = new IntentFilter();
         filter.addAction("com.parrot.filemanager.action.DELETE_RESULT");
-        filter.addAction("com.parrot.filemanager.action.RENAME_RESULT");
+        filter.addAction("com.parrot.filemanager.action.RENAME_COMPLETED");
         AppController.getInstance().getApplicationContext().registerReceiver(mReceiver, filter);
 
         return view;
@@ -305,7 +305,7 @@ public class InternalStorageFragment extends Fragment implements MainActivity.Bu
                 internalStorageFilesModelArrayList.clear();
                 getFilesList(rootPath);
                 internalStorageListAdapter.notifyDataSetChanged();
-            } else if ("com.parrot.filemanager.action.RENAME_RESULT".equals(action)) {
+            } else if ("com.parrot.filemanager.action.RENAME_COMPLETED".equals(action)) {
                 Log.d("mytest", "Refresh list after rename");
                 internalStorageFilesModelArrayList.clear();
                 getFilesList(rootPath);
